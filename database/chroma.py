@@ -4,6 +4,8 @@ from chromadb.config import Settings
 import os
 import multiprocessing
 from datetime import datetime
+import argparse
+import json
 
 # Configurar cliente persistente com configurações otimizadas
 client = chromadb.PersistentClient(
@@ -99,15 +101,28 @@ def add_embedding(id, embedding, metadata=None):
             
             # Extrair categoria do caminho
             parts = metadata['path'].split(os.sep)
-            category = next((part for part in parts if 'Pepper__bell___' in part), None)
+            category = next((part for part in parts if 'leaf_' in part), None)
             if category:
                 metadata['category'] = category
+
+        # Debugging: Print the embedding being added
+        print(f"Adding embedding for ID {id}: {embedding}")
 
         collection.add(
             embeddings=[embedding],
             ids=[id],
             metadatas=[metadata] if metadata else None
         )
+
+        # Verificação de adição
+        added = collection.get(include=["embeddings", "metadatas"])
+        if added and 'ids' in added and id in added['ids']:
+            print(f"Embedding '{embedding}' adicionado com sucesso.")
+        else:
+            print(f"Falha ao verificar inserção de '{id}'.")
+
+        results = collection.get(include=["embeddings", "metadatas"])
+        print(f"results: {results}")
         return True
     except Exception as e:
         print(f"Erro ao adicionar embedding: {str(e)}")
@@ -456,16 +471,7 @@ def analyze_query_results(results):
         print(f"Erro ao analisar resultados: {str(e)}")
         return None
 
-def get_collection_stats():
-    """Retorna estatísticas da coleção"""
-    try:
-        count = collection.count()
-        return {
-            "total_images": count
-        }
-    except Exception as e:
-        print(f"Erro ao obter estatísticas: {str(e)}")
-        return None
+
 
 def extract_features(embedding):
     """Extrai e formata as características do embedding"""
