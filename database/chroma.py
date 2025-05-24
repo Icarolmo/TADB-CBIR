@@ -43,14 +43,16 @@ def get_database_stats():
             return {
                 "total_images": 0,
                 "categories": {},
-                "last_update": None
+                "last_update": None,
+                "ids": []
             }
         
         # Inicializar estatísticas
         stats = {
             "total_images": len(results["ids"]),
             "categories": {},
-            "last_update": None
+            "last_update": None,
+            "ids": results["ids"]
         }
         
         # Processar metadados
@@ -600,3 +602,25 @@ def extract_features(embedding):
         'lbp': lbp_features,
         'shape': shape_features
     }
+
+def get_embedding_by_id(image_id):
+    """Recupera um embedding e seus metadados pelo ID."""
+    try:
+        results = collection.get(
+            ids=[image_id],
+            include=["embeddings", "metadatas"]
+        )
+        
+        if results and results['ids']:
+            # Retorna o primeiro (e único) resultado encontrado
+            return {
+                'id': results['ids'][0],
+                'embedding': results['embeddings'][0],
+                'metadata': results['metadatas'][0]
+            }
+        else:
+            return None # Nenhum resultado encontrado
+            
+    except Exception as e:
+        print(f"Erro ao obter embedding por ID: {str(e)}")
+        return {"error": str(e)}
