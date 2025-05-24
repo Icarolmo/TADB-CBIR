@@ -471,9 +471,13 @@ def visualize_features(image_path, features_dict):
     # 6b. Características de Textura (GLCM - Parte 2)
     plt.subplot(337)
     glcm_features2 = features_dict['features'][112:116]  # Últimos 4 valores GLCM
-    plt.bar(['Dissimil.', 'Entropia', 'Clust.Shade', 'Clust.Prom.'], glcm_features2)
-    plt.title('GLCM (Parte 2)')
+    labels_glcm2 = ['Dissimil.', 'Entropia', 'Clust.Shade', 'Clust.Prom.']
+    plt.bar(labels_glcm2, glcm_features2)
+    plt.title('GLCM - Métricas de Textura (Parte 2)')
+    plt.xlabel('Métricas')
+    plt.ylabel('Valor Normalizado')
     plt.xticks(rotation=45)
+    plt.ylim(0, max(glcm_features2) * 1.1 if max(glcm_features2) > 0 else 1)
     
     # 7. Características LBP
     plt.subplot(338)
@@ -485,12 +489,31 @@ def visualize_features(image_path, features_dict):
     # 8. Características de Forma
     plt.subplot(339)
     shape_features = features_dict['features'][-8:]  # 8 valores de forma
-    labels = ['Num.Les.', 'Tam.Med.', 'Desv.Tam.', 'Area.Af.',
-             'Dens.Les.', 'Circ.', 'Dist.Med.', 'Desv.Dist.']
-    plt.bar(range(len(shape_features)), shape_features)
-    plt.xticks(range(len(shape_features)), labels, rotation=45)
-    plt.title('Características de Forma')
-    
+
+    # Escalar apenas a área afetada para porcentagem
+    scaled_shape_features = list(shape_features)
+    scaled_shape_features[3] = scaled_shape_features[3] * 100  # Área afetada em porcentagem
+
+    labels = [
+        'Nº Lesões',
+        'Tamanho Médio (px)',
+        'Desvio Tamanho (px)',
+        'Área Afetada (%)',
+        'Densidade Lesões',
+        'Circularidade',
+        'Distância Média (px)',
+        'Desvio Distância (px)'
+    ]
+
+    plt.bar(range(len(scaled_shape_features)), scaled_shape_features)
+    plt.xticks(range(len(scaled_shape_features)), labels, rotation=45, ha='right')
+    plt.title('Características de Forma e Distribuição')
+    plt.xlabel('Métricas')
+    plt.ylabel('Valor')
+
+    # Adicionar anotação para o número de lesões
+    plt.text(0, scaled_shape_features[0], f'{scaled_shape_features[0]:.0f}', ha='right', va='bottom')
+
     plt.tight_layout()
     
     # Salvar a visualização
