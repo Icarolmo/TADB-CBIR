@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import shutil
 import argparse
+from datetime import datetime
 
 def parse_arguments():
     """Parse command line arguments"""
@@ -93,14 +94,28 @@ def process_dataset():
 def process_query_image(image_path):
     """Processa uma imagem de consulta e retorna os resultados"""
     try:
-        # Processar imagem com visualização
+        # Processar imagem original para consulta
+        query_result = engine.process_image(image_path, save_to_db=False, visualize=False)
+        
+        if "error" in query_result:
+            return {"error": query_result["error"]}
+        
+        # Processar imagem com visualização (apenas para gerar a imagem de análise)
         result = engine.process_image(image_path, save_to_db=False, visualize=True)
         
         if "error" in result:
             return {"error": result["error"]}
         
-        # Consultar imagens similares
-        query_results = chroma.query_embedding(result["features"])
+        # Adicionar metadados da imagem de consulta
+        query_metadata = {
+            "path": image_path,
+            "type": "leaf_disease",
+            "processing_date": str(datetime.now()),
+            "category": "query"  # Marcar como imagem de consulta
+        }
+        
+        # Consultar imagens similares usando as características da imagem original
+        query_results = chroma.query_embedding(query_result["features"], metadata=query_metadata)
         
         if not query_results:
             return {"error": "Erro ao consultar banco de dados"}
@@ -113,6 +128,19 @@ def process_query_image(image_path):
         
         # Adicionar caminho da visualização ao resultado
         analysis["visualization_path"] = result.get("visualization_path")
+        
+        # Atualizar a categoria da imagem de análise para corresponder ao resultado
+        analysis_path = result.get("visualization_path")
+        if analysis_path:
+            # Processar a imagem de análise novamente com a categoria correta
+            analysis_metadata = {
+                "path": analysis_path,
+                "type": "leaf_disease_analysis",
+                "processing_date": str(datetime.now()),
+                "original_image": image_path,
+                "category": analysis["identified_category"]  # Usar a categoria identificada (leaf_healthy ou leaf_with_disease)
+            }
+            engine.process_image(analysis_path, save_to_db=True, visualize=False, metadata=analysis_metadata)
         
         return analysis
         
@@ -163,7 +191,8 @@ def main():
         print("Coloque uma imagem em image/uploads/")
         return
     
-    print("\nAnalisando imagem...")
+    print("\n=== SISTEMA DE ANÁLISE DE DOENÇAS EM FOLHAS ===")
+    print("Analisando imagem...")
     result = process_query_image(query_path)
     
     if isinstance(result, dict) and "error" in result:
@@ -171,52 +200,67 @@ def main():
         return
     
     # Exibir resultados
-    print("\nResultados da análise:")
-    print("=" * 50)
+    print("\n" + "="*50)
+    print("RESULTADOS DA ANÁLISE".center(50))
+    print("="*50)
     
     if "identified_category" in result:
         category = result["identified_category"]
         confidence = result["confidence"]
-        print(f"\nDoença Identificada: {category}")
-        print(f"Nível de Confiança: {confidence:.1f}%")
         
-        print("\nDistribuição de categorias:")
+        # Exibir diagnóstico
+        print("\n📋 DIAGNÓSTICO")
+        print("-"*50)
+        print(f"Categoria identificada: {category}")
+        print(f"Nível de confiança: {confidence:.1f}%")
+        
+        # Exibir distribuição de categorias
+        print("\n📊 DISTRIBUIÇÃO DE CATEGORIAS")
+        print("-"*50)
         for cat, perc in result["category_distribution"].items():
-            cat_name = cat
-            print(f"- {cat_name}: {perc:.1f}%")
+            cat_name = "Folha Saudável" if cat == "leaf_healthy" else "Folha com Doença"
+            print(f"• {cat_name}: {perc:.1f}%")
         
-        # Mostrar as 5 imagens mais similares
-        print("\nImagens mais similares encontradas:")
-        print("=" * 50)
-        for i, img in enumerate(result["similar_images"], 1):
-            category = img["category"]
+        # Exibir imagens similares
+        print("\n🔍 IMAGENS MAIS SIMILARES ENCONTRADAS")
+        print("-"*50)
+        # Ordenar imagens por similaridade em ordem decrescente
+        sorted_images = sorted(result["similar_images"], key=lambda x: x["similarity"], reverse=True)
+        for i, img in enumerate(sorted_images, 1):
+            category = "Folha Saudável" if img["category"] == "leaf_healthy" else "Folha com Doença"
             similarity = img["similarity"]
             print(f"\nImagem #{i}:")
-            print(f"- Categoria: {category}")
-            print(f"- Similaridade: {similarity:.1f}%")
-            print(f"- Caminho: {img['metadata']['path']}")
+            print(f"• Categoria: {category}")
+            print(f"• Similaridade: {similarity:.1f}%")
+            print(f"• Caminho: {img['metadata']['path']}")
             
         # Adicionar recomendações baseadas na confiança
-        print("\nRecomendações:")
+        print("\n💡 RECOMENDAÇÕES")
+        print("-"*50)
         if confidence >= 80:
             print("✅ Diagnóstico altamente confiável")
+            print("\nAções recomendadas:")
             print("1. Consulte um especialista para confirmar o diagnóstico")
             print("2. Pesquise tratamentos específicos para", category)
             print("3. Isole as plantas afetadas para evitar propagação")
         elif confidence >= 50:
             print("⚠️ Diagnóstico provável, mas necessita confirmação")
+            print("\nAções recomendadas:")
             print("1. Faça uma inspeção visual detalhada da planta")
             print("2. Tire mais fotos de diferentes ângulos")
             print("3. Consulte um especialista para confirmação")
         else:
             print("❓ Diagnóstico incerto")
+            print("\nAções recomendadas:")
             print("1. Tire novas fotos com melhor iluminação e foco")
             print("2. Certifique-se de fotografar a área afetada mais de perto")
             print("3. Consulte um especialista para uma avaliação presencial")
     else:
         print("Não foi possível identificar a doença.")
     
-    print("\nImagem de análise salva em:", result.get("visualization_path", "N/A"))
+    print("\n" + "="*50)
+    print(f"Imagem de análise salva em: {result.get('visualization_path', 'N/A')}")
+    print("="*50 + "\n")
 
 if __name__ == "__main__":
     main() 

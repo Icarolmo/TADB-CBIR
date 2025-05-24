@@ -117,10 +117,10 @@ def extract_disease_features(image, mask, image_path=None):
         
         # Critérios mais sensíveis para HSV
         hsv_disease = (
-            ((h_channel < (h_mean - 1.0 * h_std)) |  # Tons diferentes do verde (mais sensível)
-             (h_channel > 140)) &                     # Tons marrons/amarelados (mais sensível)
-            (s_channel < (s_mean - 0.8 * s_std)) &   # Baixa saturação (mais sensível)
-            (v_channel < (v_mean - 1.0 * v_std))     # Regiões mais escuras (mais sensível)
+            ((h_channel < (h_mean - 0.8 * h_std)) |  # Tons diferentes do verde (mais sensível)
+             (h_channel > 140)) &                     # Tons marrons/amarelados
+            (s_channel < (s_mean - 0.6 * s_std)) &   # Baixa saturação (mais sensível)
+            (v_channel < (v_mean - 0.8 * v_std))     # Regiões mais escuras (mais sensível)
         )
         
         hsv_mask[valid_mask] = hsv_disease[valid_mask]
@@ -142,9 +142,9 @@ def extract_disease_features(image, mask, image_path=None):
         # Critérios mais sensíveis para LAB
         lab_mask = np.zeros_like(mask)
         lab_disease = (
-            (l_channel < (l_mean - 1.0 * l_std)) &   # Regiões mais escuras (mais sensível)
-            ((a_channel > (a_mean + 1.0 * a_std)) |  # Desvio para vermelho
-             (b_channel > (b_mean + 1.0 * b_std)))   # Desvio para amarelo
+            (l_channel < (l_mean - 0.8 * l_std)) &   # Regiões mais escuras (mais sensível)
+            ((a_channel > (a_mean + 0.8 * a_std)) |  # Desvio para vermelho (mais sensível)
+             (b_channel > (b_mean + 0.8 * b_std)))   # Desvio para amarelo (mais sensível)
         )
         
         lab_mask[valid_mask] = lab_disease[valid_mask]
@@ -159,14 +159,14 @@ def extract_disease_features(image, mask, image_path=None):
                             (kernel_size, kernel_size))
         
         # Limiar de textura mais sensível
-        texture_thresh = np.percentile(local_std[valid_mask], 70)  # Percentil mais baixo
+        texture_thresh = np.percentile(local_std[valid_mask], 65)  # Percentil mais baixo
         texture_mask[valid_mask] = (local_std > texture_thresh)[valid_mask]
         
         # 4. Combinar as máscaras de forma mais sensível
         # Requer que a região seja detectada em pelo menos uma análise forte ou duas fracas
-        hsv_weight = 1.5  # Peso maior para HSV
-        lab_weight = 1.2  # Peso médio para LAB
-        texture_weight = 1.0  # Peso normal para textura
+        hsv_weight = 1.2  # Peso menor para HSV
+        lab_weight = 1.0  # Peso menor para LAB
+        texture_weight = 1.0
         
         weighted_sum = (
             hsv_mask.astype(float) * hsv_weight +
@@ -174,8 +174,8 @@ def extract_disease_features(image, mask, image_path=None):
             texture_mask.astype(float) * texture_weight
         )
         
-        # Uma região é considerada doente se tiver peso total >= 2.0
-        combined_mask = (weighted_sum >= 2.0).astype(np.uint8) * 255
+        # Uma região é considerada doente se tiver peso total >= 1.8 (mais sensível)
+        combined_mask = (weighted_sum >= 1.8).astype(np.uint8) * 255
         
         # 5. Pós-processamento mais sensível
         kernel_small = np.ones((3,3), np.uint8)
@@ -195,8 +195,8 @@ def extract_disease_features(image, mask, image_path=None):
         
         # Parâmetros mais sensíveis para filtragem de contornos
         leaf_area = np.sum(mask) / 255.0
-        min_area = max(10, leaf_area * 0.0008)  # 0.08% da folha (mais sensível)
-        max_area = leaf_area * 0.35  # 35% da folha
+        min_area = max(5, leaf_area * 0.0005)  # 0.05% da folha (mais sensível)
+        max_area = leaf_area * 0.40  # 40% da folha
         
         valid_contours = 0
         for contour in contours:
@@ -216,15 +216,15 @@ def extract_disease_features(image, mask, image_path=None):
                     roi_std = np.std(roi_valid)
                     
                     # Critérios mais sensíveis para validação
-                    intensity_valid = roi_mean < (np.mean(gray[valid_mask]) - 0.8 * np.std(gray[valid_mask]))
-                    texture_valid = np.mean(local_std[mask_roi > 0]) > texture_thresh * 0.8
+                    intensity_valid = roi_mean < (np.mean(gray[valid_mask]) - 0.6 * np.std(gray[valid_mask]))
+                    texture_valid = np.mean(local_std[mask_roi > 0]) > texture_thresh * 0.7
                     
                     # Verificar forma do contorno
                     perimeter = cv2.arcLength(contour, True)
                     circularity = 4 * np.pi * area / (perimeter * perimeter)
                     
                     # Critérios mais flexíveis para aceitação
-                    if (intensity_valid or texture_valid) and 0.2 < circularity < 0.95:
+                    if (intensity_valid or texture_valid) and 0.15 < circularity < 0.98:
                         cv2.drawContours(final_mask, [contour], -1, 255, -1)
                         valid_contours += 1
         
@@ -501,50 +501,67 @@ def visualize_features(image_path, features_dict):
     
     return output_path
 
-def process_image(path: str, save_to_db: bool = True, visualize: bool = False):
-    """Processa a imagem e opcionalmente salva no banco de dados"""
-    # Carregar imagem
-    image = cv2.imread(path)
-    
-    if image is None:
-        return {"error": "Erro ao carregar a imagem."}
-    
-    print(f"\n=== Processando imagem: {path} ===")
-    
+def preprocess_image(image):
+    """Pré-processa a imagem para análise"""
     # Redimensionar para um tamanho padrão
     image = cv2.resize(image, (224, 224))
     
-    # Segmentar a folha
+    # Aplicar máscara da folha
     mask = segment_leaf(image)
+    processed = cv2.bitwise_and(image, image, mask=mask)
     
-    # Extrair características
-    features, feature_names = extract_disease_features(image, mask, path)
-    
-    # Preparar resultado
-    result = {
-        "features": features.tolist(),
-        "feature_names": feature_names,
-        "processed_image": cv2.bitwise_and(image, image, mask=mask),
-        "mask": mask,
-        "original_image": image
-    }
-    
-    if save_to_db:
-        # Salvar no ChromaDB
-        metadata = {
-            "path": path,
-            "type": "leaf_disease",
-            "processing_date": str(datetime.now())
+    return processed
+
+def process_image(image_path, save_to_db=False, visualize=False, metadata=None):
+    """Processa uma imagem e extrai suas características"""
+    try:
+        # Carregar imagem
+        image = cv2.imread(image_path)
+        if image is None:
+            return {"error": f"Não foi possível carregar a imagem: {image_path}"}
+        
+        # Processar imagem
+        processed_image = preprocess_image(image)
+        
+        # Extrair características
+        features, feature_names = extract_disease_features(image, segment_leaf(image), image_path)
+        
+        # Gerar visualização se solicitado
+        visualization_path = None
+        if visualize:
+            visualization_path = visualize_features(image_path, {
+                "features": features.tolist(),
+                "feature_names": feature_names,
+                "processed_image": processed_image,
+                "mask": segment_leaf(image)
+            })
+            print(f"Imagem de análise gerada: {visualization_path}")
+        
+        # Salvar no banco de dados se solicitado
+        if save_to_db:
+            # Usar metadados fornecidos ou criar novos
+            if metadata is None:
+                metadata = {
+                    "path": image_path,
+                    "type": "leaf_disease",
+                    "processing_date": str(datetime.now())
+                }
+            
+            # Gerar ID único baseado no caminho da imagem
+            image_id = str(hash(image_path))
+            
+            # Adicionar ao banco de dados
+            if not chroma.add_embedding(image_id, features.tolist(), metadata):
+                return {"error": "Erro ao salvar no banco de dados"}
+        
+        return {
+            "features": features.tolist(),
+            "feature_names": feature_names,
+            "processed_image": processed_image,
+            "mask": segment_leaf(image),
+            "original_image": image,
+            "visualization_path": visualization_path
         }
-        chroma.add_embedding(
-            id=path.split("/")[-1],
-            embedding=features.tolist(),
-            metadata=metadata
-        )
-    
-    # Apenas gerar visualização se explicitamente solicitado
-    if visualize:
-        result["visualization_path"] = visualize_features(path, result)
-        print(f"Imagem de análise gerada: {result['visualization_path']}")
-    
-    return result
+        
+    except Exception as e:
+        return {"error": str(e)}
