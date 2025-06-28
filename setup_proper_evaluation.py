@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Script para configurar avaliação adequada do sistema CBIR
-Divide o dataset e configura treinamento/teste sem sobreposição
+Divide o dataset e configura referência/teste sem sobreposição
 """
 
 import os
@@ -48,8 +48,8 @@ def setup_proper_evaluation():
         shutil.rmtree("database/chroma_db")
         print("   ✅ Banco de dados removido")
     
-    # Treinar sistema com imagens de treinamento
-    print("\n🎯 Treinando sistema com imagens de treinamento...")
+    # Preparando sistema com imagens de referência
+    print("\n🎯 Preparando sistema com imagens de referência...")
     os.system("python cbir.py --process-only --train-dir image/dataset/train")
     
     # Configurar teste
@@ -64,10 +64,10 @@ def setup_proper_evaluation():
     
     print("\n✅ Configuração concluída!")
     print("\n📊 Estrutura final:")
-    print("   image/dataset/train/     - Imagens para treinamento (80%)")
+    print("   image/dataset/train/     - Imagens de referência (80%)")
     print("   image/dataset/test/      - Backup das imagens de teste (20%)")
     print("   image/test_dataset/      - Imagens para avaliação (20%)")
-    print("   database/chroma_db       - Banco de dados treinado")
+    print("   database/chroma_db       - Banco de dados indexado")
     
     print("\n🚀 Próximos passos:")
     print("   1. Execute: python test_evaluation.py")

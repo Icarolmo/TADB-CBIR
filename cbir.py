@@ -21,7 +21,7 @@ def parse_arguments():
     parser.add_argument('--test-dataset', type=str, default='image/test_dataset',
                       help='Caminho para dataset de teste (usado com --evaluate)')
     parser.add_argument('--train-dir', type=str, default='image/dataset',
-                      help='Caminho para o diretório de treinamento (usado com --process-only)')
+                      help='Caminho para o diretório de referência (usado com --process-only)')
     parser.add_argument('--generate-report', action='store_true',
                       help='Gera relatório visual da avaliação')
     return parser.parse_args()
@@ -33,7 +33,7 @@ def process_dataset(dataset_path):
     
     # Verificar se o diretório existe
     if not dataset_dir.exists():
-        print(f"\n❌ ERRO: O diretório de treinamento '{dataset_path}' não foi encontrado.")
+        print(f"\n❌ ERRO: O diretório de referência '{dataset_path}' não foi encontrado.")
         return
     
     # Verificar se há imagens no diretório dataset
@@ -41,11 +41,11 @@ def process_dataset(dataset_path):
                       if _.suffix.lower() in ['.jpg', '.jpeg', '.png'])
     
     if total_images == 0:
-        print("\nAVISO: Nenhuma imagem encontrada no dataset.")
+        print("\nAVISO: Nenhuma imagem encontrada no conjunto de referência.")
         print(os.path.abspath("image/dataset"))
         return
     
-    print(f"\nEncontradas {total_images} imagens para processar.")
+    print(f"\nEncontradas {total_images} imagens para processar no conjunto de referência.")
     
     # Dicionário para armazenar estatísticas por categoria
     stats = {}
@@ -236,7 +236,7 @@ def main():
         print("Banco de dados limpo.")
 
     if args.process_only:
-        print(f"Iniciando processamento do dataset em: {args.train_dir}")
+        print(f"Iniciando processamento do conjunto de referência em: {args.train_dir}")
         process_dataset(args.train_dir)
         return
 
@@ -248,7 +248,7 @@ def main():
     stats = chroma.get_database_stats()
     if stats["total_images"] == 0:
         print("\nNenhuma imagem encontrada no banco de dados!")
-        print("Execute primeiro com --process-only para processar o dataset.")
+        print("Execute primeiro com --process-only para processar o conjunto de referência.")
         return
     
     # Processar imagem de consulta

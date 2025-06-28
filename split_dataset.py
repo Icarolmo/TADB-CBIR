@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Script para dividir o dataset em treinamento e teste
-Evita usar as mesmas imagens para treinar e testar
+Script para dividir o dataset em referência e teste
+Evita usar as mesmas imagens para indexar e testar
 """
 
 import os
@@ -12,11 +12,11 @@ import argparse
 
 def split_dataset(source_dir, train_ratio=0.8, random_seed=42):
     """
-    Divide o dataset em treinamento e teste
+    Divide o dataset em referência e teste
     
     Args:
         source_dir: Diretório com as imagens originais
-        train_ratio: Proporção para treinamento (0.8 = 80%)
+        train_ratio: Proporção para referência (0.8 = 80%)
         random_seed: Semente para reprodutibilidade
     """
     
@@ -39,7 +39,7 @@ def split_dataset(source_dir, train_ratio=0.8, random_seed=42):
         (test_dir / category).mkdir(parents=True, exist_ok=True)
     
     print(f"🔄 Dividindo dataset de: {source_dir}")
-    print(f"📊 Proporção: {train_ratio*100}% treinamento, {(1-train_ratio)*100}% teste")
+    print(f"📊 Proporção: {train_ratio*100}% referência, {(1-train_ratio)*100}% teste")
     
     total_images = 0
     train_count = 0
@@ -70,10 +70,10 @@ def split_dataset(source_dir, train_ratio=0.8, random_seed=42):
         
         print(f"\n📁 Categoria: {category}")
         print(f"   Total de imagens: {len(images)}")
-        print(f"   Treinamento: {len(train_images)}")
+        print(f"   Referência: {len(train_images)}")
         print(f"   Teste: {len(test_images)}")
         
-        # Copiar imagens para treinamento
+        # Copiar imagens para referência
         for img_path in train_images:
             dest_path = train_dir / category / img_path.name
             shutil.copy2(img_path, dest_path)
@@ -90,19 +90,19 @@ def split_dataset(source_dir, train_ratio=0.8, random_seed=42):
     print(f"\n✅ Divisão concluída!")
     print(f"📊 Resumo:")
     print(f"   Total de imagens: {total_images}")
-    print(f"   Treinamento: {train_count} ({train_count/total_images*100:.1f}%)")
+    print(f"   Referência: {train_count} ({train_count/total_images*100:.1f}%)")
     print(f"   Teste: {test_count} ({test_count/total_images*100:.1f}%)")
     print(f"\n📁 Diretórios criados:")
-    print(f"   Treinamento: {train_dir}")
+    print(f"   Referência: {train_dir}")
     print(f"   Teste: {test_dir}")
     
     return train_dir, test_dir
 
 def main():
-    parser = argparse.ArgumentParser(description="Dividir dataset em treinamento e teste")
+    parser = argparse.ArgumentParser(description="Dividir dataset em referência e teste")
     parser.add_argument("source_dir", help="Diretório com as imagens originais")
     parser.add_argument("--train-ratio", type=float, default=0.8, 
-                       help="Proporção para treinamento (padrão: 0.8)")
+                       help="Proporção para referência (padrão: 0.8)")
     parser.add_argument("--seed", type=int, default=42,
                        help="Semente aleatória (padrão: 42)")
     
